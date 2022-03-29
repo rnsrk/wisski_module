@@ -1,0 +1,717 @@
+<?php
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\wisski_pathbuilder\Entity\WisskiPathbuilderEntity;
+use Drupal\wisski_salz\Entity\Adapter;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\wisski_core\Entity\WisskiBundle;
+use Drupal\Core\Breadcrumb\Breadcrumb;
+use Drupal\Core\Link;
+use Drupal\wisski_core\WisskiHelper;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\wisski_core\WisskiEntityInterface;
+use Drupal\wisski_core\Entity\WisskiEntity;
+use Drupal\wisski_core\WisskiCacheHelper;
+use Drupal\wisski_salz\AdapterHelper;
+use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Url;
+
+use Symfony\Component\HttpFoundation\Request;
+
+use Drupal\wisski_core\WisskiToolbarHandler;
+
+define('WISSKI_DEVEL', FALSE);
+#define('WISSKI_DEVEL', TRUE);
+
+/**
+ * Implementation of Hook_help
+ */
+function wisski_core_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.wisski_core':
+      return '<p>' . t('This is the most basic WissKI module. You will need it!') . '</p>';
+  }
+}
+
+function wisski_core_cache_flush() {
+
+  WisskiCacheHelper::flushAllEntityTitles();
+  WisskiCacheHelper::flushAllPreviewImageUris();
+  \Drupal::messenger()->addStatus(t('Flushed WissKI specific caches'));
+}
+
+function wisski_core_excel_export($ob) {
+#  drupal_set_message(serialize($ob));
+#  dpm($ob, "ex");
+
+  $data_rows = $ob['actions']['export']['#submit']['data'];  
+
+  if(empty($data_rows)) {
+    \Drupal::messenger()->addError("Please do a search and export the results in excel afterwards.");
+    return;
+  }
+
+  $id = $data_rows[0]['type'];
+  $bundleid = $data_rows[0]['bundle_id'];
+
+  $pbs_info = \Drupal::service('wisski_pathbuilder.manager')->getPbsUsingBundle($bundleid);
+#  $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('wisski_individual',$bundleid);
+
+#dpm($pbs_info, "info");
+  $filename = \Drupal::service('file_system')->getTempDirectory() . "/" . $id . ".xls";
+
+  $fh = fopen($filename, "w+");
+
+  $pb_paths = array();
+  $adapters = array();
+  $pbs = array();
+
+  foreach($pbs_info as $pbdata) {
+    $pb = WisskiPathbuilderEntity::load($pbdata['pb_id']);
+    $allpaths = $pb->getAllPathsForBundleId($bundleid, TRUE);
+    $pb_paths[$pb->id()] = $allpaths;
+    $pbs[$pb->id()] = $pb;
+    $adapters[$pb->id()] = Adapter::load($pbdata['adapter_id']);
+  }
+
+  foreach($pb_paths as $key => $paths) {
+    foreach($paths as $path) {
+      $pathname = $path->getName();
+      fwrite($fh, iconv('UTF-8', 'cp1250', $pathname) . "\t");
+    }
+  }
+
+  fwrite($fh, "\n");
+
+  // local cache
+  $field_definitions_per_bundle = array();
+
+  foreach($data_rows as $data_row) {
+    foreach($pb_paths as $pb_id => $paths) {
+      $adapter = $adapters[$pb_id];
+      $pb = $pbs[$pb_id];
+
+      foreach($paths as $path) {
+        $values = $adapter->getEngine()->pathToReturnValue($path, $pb, $data_row['entity_id'], 0, NULL, FALSE);
+
+	// as this is complex, only do a calculation if there was a value
+	if(count($values) > 0) {
+
+	  // get the pbp
+  	  $pbp = $pb->getPbPath($path->getID());
+	  $pb_bundle = $pbp['bundle'];
+
+	  $field_definitions = NULL;
+
+	  // only act if a bundle is set.
+	  if(isset($pb_bundle) && !isset($field_definitions_per_bundle[$pb_bundle])) {
+	    // get it from the definitions
+            $field_definitions = \Drupal::service('entity_field.manager')->getFieldDefinitions('wisski_individual',$pb_bundle);
+	    // add it to the local cache
+	    $field_definitions_per_bundle[$pb_bundle] = $field_definitions;
+          } else if( isset($pb_bundle) && isset($field_definitions_per_bundle[$pb_bundle])) {
+	    // fetch it from the local cache.
+	    $field_definitions = $field_definitions_per_bundle[$pb_bundle];
+	  }
+
+	  // only act if it is not a group!
+	  if(isset($field_definitions) && !$path->isGroup()) {
+
+	    $fieldid = $pbp['field'];
+	
+	    if(isset($fieldid) && isset($field_definitions[$fieldid])) {
+	      $field_def = $field_definitions[$fieldid];
+#	      dpm($field_def, "fd");
+	      if($field_def->getType() == "entity_reference") {
+	        #dpm($values, "val");
+#	        $new_values = array();
+
+		foreach($values as $vk => $value) {
+		  $d_eid = AdapterHelper::getDrupalIdForUri($value);
+	          $title = wisski_core_generate_title($d_eid);
+                  if(is_array($title)) {
+		    $clanguage = \Drupal::service('language_manager')->getCurrentLanguage()->getId();
+                    $title = $title[$clanguage][0]['value']; 
+                  }
+		  $values[$vk] = $title;
+                }
+#	        $bundle = \Drupal\wisski_core\Entity\WisskiBundle::load($pb_bundle);
+#	        dpm($title, "title");
+#	        dpm("juhu!");
+	      }
+	    }
+	  }
+	}
+
+	if(count($values) == 1 && ( is_numeric(current($values)) || ( !is_array(current($values)) && preg_match('/^((\d+)(\.)*)+$/', current($values), $m) != FALSE) ) )  
+	  fwrite($fh, "=\"");
+	else
+	  fwrite($fh, "\"");	
+
+	$i = 0;
+        foreach($values as $value) {
+          $var = strip_tags($value);
+          $var = str_replace('"', '""', $var);
+          fwrite($fh, iconv('UTF-8', 'cp1250', $var));
+
+          $i++;
+          if($i < count($values))
+            fwrite($fh, "\n");
+        }
+        fwrite($fh, "\"");
+        fwrite($fh, "\t");
+      }  
+    }
+    fwrite($fh, "\n");
+  }
+
+  fclose($fh);
+
+#  dpm($data_rows);
+
+  header("Pragma: public");
+  header("Expires: 0");
+  header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
+  header("Cache-Control: private",false);
+  header("Content-Type: application/vnd.ms-excel");
+  header("Content-Disposition: attachment; filename=\"" . basename($filename) . "\";" );
+  header("Content-Transfer-Encoding: binary");
+
+  readfile($filename);
+
+  flush();
+
+#  unlink($filename);
+
+  exit();
+  
+  return FALSE;
+}
+
+
+/**
+ * Use this hook to set the right form display settings for
+ * entity reference
+ * This can not be handled by the storage!
+ */
+function wisski_core_entity_prepare_form(EntityInterface $entity, $operation, FormStateInterface $form_state) {
+
+#  dpm($entity->id(), "entity");
+
+  // only act on WissKI-Entities
+  if(! $entity instanceOf WisskiEntity)
+    return;
+
+  // get the storage
+  $storage = $form_state->getStorage();
+
+  // only act if there is a form display
+  if(isset($storage['form_display'])) {
+    $form_display = $storage['form_display'];
+#    dpm(serialize($form_display), "fd");
+    // for every field in this display act    
+    foreach($form_display->getComponents() as $key => $comp) {
+
+      // get the field definition
+      $fdef = $entity->getFieldDefinition($key);
+
+      // base field?
+      if($fdef instanceof BaseFieldDefinition)
+        continue;
+
+      // only act if the field is entity_reference
+      if(!empty($fdef) && $fdef->get('field_type') == "entity_reference") {
+
+        // get the settings
+        $settings = $entity->get($key)->getSettings();
+        // get the target bundles
+        $target_bundles = $settings['handler_settings']['target_bundles'];
+
+#	dpm($target_bundles, "target for entity id " . $entity->id());
+
+        // get all values
+        $values = $entity->get($key)->getValue();
+
+        // and insert that
+        foreach($values as $value) {
+          foreach($target_bundles as $target_bundle) {
+            $entity_id = $value['target_id'];
+
+            try {
+#		dpm($entity_id, $target_bundle);
+              WisskiCacheHelper::putCallingBundle($entity_id,$target_bundle);
+            } catch (\Exception $e) {
+            }
+          }
+        }
+      }
+ 
+    }
+  }
+}
+
+function wisski_core_entity_prepare_view($entity_type_id, array $entities, array $displays, $view_mode) {
+  foreach($entities as $entity) {
+    if(! $entity instanceOf WisskiEntity)
+      continue;
+    foreach($displays as $display) {
+      foreach($display->getComponents() as $key => $comp) {
+
+	$fdef = $entity->getFieldDefinition($key);
+
+	if($fdef instanceof BaseFieldDefinition)
+          continue;
+
+        if(!empty($fdef) && $fdef->get('field_type') == "entity_reference") {
+          $settings = $entity->get($key)->getSettings();
+          $target_bundles = $settings['handler_settings']['target_bundles'];
+
+          $values = $entity->get($key)->getValue();
+          foreach($values as $value) {
+            foreach($target_bundles as $target_bundle) {
+              $entity_id = $value['target_id'];
+
+              try {
+#		dpm($entity_id, $target_bundle);
+                WisskiCacheHelper::putCallingBundle($entity_id,$target_bundle);
+              } catch (\Exception $e) {
+              #dpm(func_get_args(), 'writeToCache');
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// this did not work, because it was too late to change
+// the view options
+/*
+function wisski_core_entity_view(array &$build, \Drupal\Core\Entity\EntityInterface $entity, \Drupal\Core\Entity\Display\EntityViewDisplayInterface $display, $view_mode) {
+
+  foreach($display->getComponents() as $key => $comp) {
+    if($build[$key]['#field_type'] == "entity_reference") {
+      $settings = $entity->get($key)->getSettings();
+      $target_bundles = $settings['handler_settings']['target_bundles'];
+
+      $values = $entity->get($key)->getValue();
+      foreach($values as $value) {
+        foreach($target_bundles as $target_bundle) {
+          $entity_id = $value['target_id'];
+	  if($entity_id == 60)
+            dpm($target_bundle, "bu");
+
+          try {
+            WisskiCacheHelper::putCallingBundle($entity_id,$target_bundle);
+          } catch (\Exception $e) {
+          #dpm(func_get_args(), 'writeToCache');
+          }
+        }
+      }
+    }
+  }
+
+}
+*/
+
+/*
+ * Title callback function
+ * Base Field is sometimes provided - and we need to be sure that this is not the case in all other cases...
+ */
+function wisski_core_generate_title($wisski_individual, $base_field = NULL, $force_new=FALSE, $override_bundle_id = NULL) {
+#  return array("en" => array(0 => array("value" => "muhaha")));
+#  dpm(serialize($wisski_individual), "yay, I do something");
+  if(!is_bool($force_new)) {
+    \Drupal::messenger()->addError("Danger Zone: force_new was not boolean!");
+  }
+
+#  dpm($force_new, "force new in core.module?");
+#  dpm(microtime(), "called once!!");
+  $create_form_title = FALSE;
+
+#  dpm(serialize($wisski_individual), "wisski core generate title");
+
+  if ($wisski_individual instanceof WisskiEntityInterface) {
+
+    if ($wisski_individual->isNew()) $create_form_title = TRUE;
+
+    $entity_id = $wisski_individual->id();
+#    dpm(serialize($wisski_individual), "eid");
+    $bundle_id = $wisski_individual->bundle();
+#    dpm($bundle_id, $entity_id);
+    if(!empty($entity_id)) {
+#      // TODO: Why do we need to cache the bundle here?
+      WisskiCacheHelper::putCallingBundle($entity_id, $bundle_id);
+    } else {
+       // this happens on create dialog - try to get the best of it!
+
+      if(!empty($bundle_id)) {
+        if ($bundle = WisskiBundle::load($bundle_id)) {
+	
+	  
+          $title = $bundle->generateEntityTitle($wisski_individual,FALSE,$force_new);
+
+	  if(empty($title))
+            $title = html_entity_decode(t('New :bundle_label',array(':bundle_label'=>$bundle->label()))->render());
+#	  dpm($title, "ret1");
+#	  $title = "juhu, ein nasenbaer";
+          return $title;
+        }
+      }
+    }
+
+  } else if($override_bundle_id === NULL) { // This is used when $wisski_individual is just a number
+    $entity_id = $wisski_individual;
+#    dpm("from cache!");
+    $bundle_id = WisskiCacheHelper::getCallingBundle($wisski_individual);
+#rpm($bundle_id, 'call');
+  }
+
+  if ($override_bundle_id !== NULL) {
+    $entity_id = $wisski_individual;
+    $bundle_id = $override_bundle_id;
+  }
+
+  // if we still have no bundle, we have to force-fetch one.
+  if(empty($bundle_id)) {
+#    dpm(microtime(), "difficult");
+    // this is very complicated... do it anyway...
+    $pbs = WisskiPathbuilderEntity::loadMultiple();
+#    dpm(microtime(), "difficult2");
+#    drupal_set_message(serialize($pbs));
+
+    foreach($pbs as $pb) {
+      $bundle_id = $pb->getBundleIdForEntityId($entity_id);
+      if (!empty($bundle_id)) break;
+    }
+  }
+
+  $title = '';
+  // only do this if we have a bundle now
+  if (!empty($bundle_id)) {
+    if ($bundle = WisskiBundle::load($bundle_id)) {
+#      dpm(microtime(), "yay!");
+#      drupal_set_message(serialize($entity_id));
+#      drupal_set_message(serialize($bundle->generateEntityTitle($entity_id,FALSE,$force_new)));
+      if ($create_form_title || empty($entity_id)) $title = html_entity_decode(t('New :bundle_label',array(':bundle_label'=>$bundle->label()))->render());
+      else $title = $bundle->generateEntityTitle($wisski_individual,FALSE,$force_new);
+    }
+  }
+
+  // if we don't have a title now, we can't do anything
+  if (empty($title)) {
+    $title = \Drupal::service('entity_type.manager')->getDefinition('wisski_individual')->getLabel().' '.$entity_id;
+    if(empty($bundle))
+      \Drupal::messenger()->addWarning(t('No title could be generated for entity ' . $entity_id . ' with bundle ' . $bundle_id));
+    else
+      \Drupal::messenger()->addWarning(t('No title could be generated for entity ' . $entity_id . ' with bundle ' . $bundle->label()));
+  }
+#  dpm($title, "ret2");
+#  return array("en" => array(array("value" => "yay?", "wisski_language" =>
+#  "en")), "fr" => array(array("value" => "juhu", "wisski_language" =>  "fr")));
+#  return array("en" => "eng", "fr" => "fra");
+  return $title;
+  
+}
+
+function wisski_core_flush_title_caches($bundle_ids=NULL,$entity_ids=NULL) {
+
+  if (is_null($bundle_ids)) {
+    WisskiCacheHelper::flushAllEntityTitles();
+    return;
+  }
+  $bundles = WisskiBundle::loadMultiple($bundle_ids);
+  foreach ($bundles as $bundle) {
+    $bundle->flushTitleCache($entity_ids);
+  }
+}
+
+/**
+ * Hook in to alter the behaviour of autocomplete.
+ * Because it currently breaks the WissKI functionality.
+ */
+function wisski_core_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+
+  // only act on wisski individuals
+  if(strpos($form_id, "wisski_individual") !== FALSE) {
+
+    $form['#attached']['library'][] = 'wisski_core/wisski_autocomplete';
+  }
+
+}
+
+/**
+ * Add the place where the entity is found in navigate
+ */
+function wisski_core_system_breadcrumb_alter(Breadcrumb &$breadcrumb, RouteMatchInterface $route_match, array $context) {
+//  dpm("yay2");
+//  dpm(serialize($context), "con");
+  $routename =  $route_match->getRouteName();
+
+  // if $routename == 'view.{bundleID}.{bundleID} => e.g. in case of navigate
+  // this adds "navigate" to the breadcrumbs
+  if(strpos($routename, 'view.') === 0) { 
+    $request = \Drupal::request();
+    $referer = $request->headers->get('referer');
+
+    $query_array = array();
+
+    global $base_url;
+
+    $new_base_url=$base_url;
+
+    $base_url_parts=parse_url($base_url);
+    $host=$base_url_parts["host"];
+
+    if(strpos($base_url, $host) !== FALSE)
+      $new_base_url=substr($base_url, strpos($base_url, $host));
+
+    $schemacount=0;
+
+    if(strpos($referer, $host) !== FALSE)
+      $schemacount=strpos($referer, $host);
+
+    if(strpos($referer, $new_base_url) !== FALSE)
+      $referer = substr($referer, $schemacount + strlen($new_base_url));
+
+    // cut away everything after ? since it are parameters...
+    if(strpos($referer, "?") !== FALSE) {
+      // get the query part.
+      $query = substr($referer, strpos($referer, "?")+1);
+
+      // parse the query
+      parse_str($query, $query_array);
+
+      // cut it away from referer
+      $referer = substr($referer, 0, strpos($referer, "?"));
+    }
+
+    // what exactly is the route where we come from?
+    $router = \Drupal::service('router.no_access_checks');
+
+
+    // get the route provider
+    $rpv = \Drupal::service('router.route_provider');
+
+    # the function: getRoutesByPattern() return an empty array on 89er and on 177er view.bundleid.bundleid
+    # is this a PHP version prob?!
+    $routes = $rpv->getRoutesByPattern($referer)->all();
+
+    if (isset($routes['entity.wisski_individual.list'])){
+      $route = $routes['entity.wisski_individual.list'];
+      $link = Link::createFromRoute($route->getDefault('_title'), "entity.wisski_individual.list");
+      $breadcrumb->addLink($link);
+    }
+  }
+
+  // only do something if we are looking at a wisski individual  
+  if($routename == 'entity.wisski_individual.canonical' || $routename == 'entity.wisski_individual.edit_form' ) {
+
+    // where do we come from?
+    $request = \Drupal::request();
+    $referer = $request->headers->get('referer');
+
+    $query_array = array();
+
+    global $base_url;
+
+    $new_base_url=$base_url;
+
+    $base_url_parts=parse_url($base_url);
+    $host=$base_url_parts["host"];
+
+    if(strpos($base_url, $host) !== FALSE)
+      $new_base_url=substr($base_url, strpos($base_url, $host));
+
+    $schemacount=0;
+
+    if(strpos($referer, $host) !== FALSE)
+      $schemacount=strpos($referer, $host);
+
+    if(strpos($referer, $new_base_url) !== FALSE)
+      $referer = substr($referer, $schemacount + strlen($new_base_url));
+
+    // cut away everything after ? since it are parameters...
+    if(strpos($referer, "?") !== FALSE) {
+      // get the query part.
+      $query = substr($referer, strpos($referer, "?")+1);
+
+      // parse the query
+      parse_str($query, $query_array);
+
+      // cut it away from referer
+      $referer = substr($referer, 0, strpos($referer, "?"));
+    }
+
+    // what exactly is the route where we come from?
+    $router = \Drupal::service('router.no_access_checks');
+
+
+    // get the route provider
+    $rpv = \Drupal::service('router.route_provider');
+    # the function: getRoutesByPattern() return an empty array on 89er and on 177er view.bundleid.bundleid
+    # is this a PHP version prob?!
+    $routes = $rpv->getRoutesByPattern($referer)->all();
+
+    $routes = array_keys($routes);
+
+    $previous_route_name = current($routes);
+
+//  dpm($referer, "pr?");
+
+    // if this holds, it is a view.
+    if(strpos($previous_route_name, 'view.') === 0) {
+
+      try {
+        $result = $router->match($referer);
+    
+      } catch (Exception $e) {
+        // was not found!
+      }
+
+
+      if(!empty($result) && isset($result['view_id'])) {
+   
+      
+        // the parent is a view - so we probably want to render this...
+      	if(!empty($result['_title']))
+          $link = Link::createFromRoute($result['_title'], $result['_route'], array(), array('query' => $query_array));
+        else {
+          // $exploded_route_name = explode('.', $previous_route_name);
+          // $bundleID = $exploded_route_name[1];
+
+          // if we have a title callback, call
+          // the title callback
+          
+
+          #dpm($result, "result");
+          #dpm($viewTitle, "titlecallback");
+          if(isset($result['_title_callback'])) {
+            // get the callback function and assign contained class and menthod
+            [$className, $methodName]  = explode('::', $result['_title_callback']);
+            // call the method with parameter on the fly 
+            $result['_title'] = call_user_func([new $className, $methodName], $result['view_id']);
+          } else {
+            // if we dont have that it is hopefully a bundle?!
+            $bundle = WisskiBundle::load($result['view_id']);
+            if(!empty($bundle) && !empty($bundle->label()))
+              $result['_title'] = $bundle->label();
+          }
+
+          if(!empty($result['_title'])){
+            $link = Link::createFromRoute($result['_title'], $result['_route'], array(), array('query' => $query_array));
+          } else
+            $link = Link::createFromRoute("Link had no Title", $result['_route'], array(), array('query' => $query_array));
+        }
+        $breadcrumb->addLink($link);
+      }
+    } else {
+    // it is no view
+//    if($routename == 'entity.wisski_individual.canonical' || $routename == 'entity.wisski_individual.edit_form' ) {
+      $entity = $route_match->getParameter('wisski_individual');
+
+
+      // might be we only use top bundles
+      $topBundles = array();
+      $set = \Drupal::configFactory()->getEditable('wisski_core.settings');
+      $only_use_topbundles = $set->get('wisski_use_only_main_bundles');
+
+      if($only_use_topbundles)
+        $topBundles = WisskiHelper::getTopBundleIds();
+
+      $bundleid = WisskiCacheHelper::getCallingBundle($entity->id());
+
+      if($only_use_topbundles && !in_array($bundleid, $topBundles)) {
+        $bundleid = AdapterHelper::getBundleIdsForEntityId($entity->id(), TRUE);
+	      $bundleid = current($bundleid);
+      }
+
+//    dpm($bundleid, "bundleid");
+//    dpm($entity->id(), "eid");
+      if(!empty($bundleid)) {
+        $bundle = WisskiBundle::load($bundleid);
+        if(!empty($bundle) && !empty($bundle->label())) {
+          $set = \Drupal::configFactory()->getEditable('wisski_core.settings');
+          $use_views = $set->get('wisski_use_views_for_navigate');
+          if(!$use_views)
+            $link = Link::createFromRoute($bundle->label(), "entity.wisski_bundle.entity_list", array("wisski_bundle" => $bundleid));
+          else
+            $link = Link::fromTextAndUrl($bundle->label(), Url::fromUserInput('/wisski_views/' . $bundleid));
+          $breadcrumb->addLink($link);
+        }
+      }
+    }
+  }
+}
+
+function wisski_core_preprocess_breadcrumb(&$variables) {
+#  dpm("yay!");
+  $variables['#cache']['contexts'][] = 'url';
+}
+
+
+function wisski_core_preprocess_layout(&$variables) {
+#dpm(serialize($variables['content']['first']['bb13d2d2eeb21077883eaaac27af6cb6']['#bundle']));
+
+#dpm(array_keys($variables['content']['first']['bb13d2d2eeb21077883eaaac27af6cb6']));
+
+  if(isset($variables['content']) && isset($variables['content']['#wisski_individual'])) {
+    $entity = $variables['content']['#wisski_individual'];
+    $bundle = $entity->bundle();
+
+    $variables['wisski_bundle'] = $bundle;
+  } else { /* best guess find... hopefully this holds! */
+    if(isset($variables['content'])) {
+      foreach($variables['content'] as $section_key => $section) {
+        if(is_array($section)) {
+          foreach($section as $subsection_key => $subsection) {
+            if(is_array($subsection) && isset($subsection['#bundle'])) {
+              $bundle = $subsection['#bundle'];
+              $variables['wisski_bundle'] = $bundle;
+              return;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implementation for hook_toolbar
+ */
+function wisski_core_toolbar() {
+
+  // get the instance.
+  return \Drupal::service('class_resolver')
+    ->getInstanceFromDefinition(WisskiToolbarHandler::class)
+    ->toolbar();
+
+}
+
+/**
+ * Implementation for hook_menu_links_discovered_alter
+ */
+function wisski_core_menu_links_discovered_alter(&$links) {
+  if (\Drupal::moduleHandler()->moduleExists('search')) {
+    $links['wisski.search_entities'] = array(
+      'title' => 'Find',
+      'route_name' => 'search.view_wisski_search',
+      'description' => new TranslatableMarkup('Search WissKI entities'),
+      'menu_name' => 'main',
+       'weight' => 10,
+//      'parent' => 'system.admin_reports',
+    );
+
+    $links['wisski.search_entities_menu'] = array(
+      'title' => 'Find',
+      'route_name' => 'search.view_wisski_search',
+      'description' => new TranslatableMarkup('Search WissKI entities'),
+      'menu_name' => 'wisski',
+       'weight' => 30,
+//      'parent' => 'system.admin_reports',
+    );
+  }
+}

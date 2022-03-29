@@ -1,0 +1,69 @@
+wisski_core.wisski_bundle.*:
+  type: config_entity
+  label: 'WissKI Bundle'
+  mapping:
+    id:
+      type: string
+      label: 'Machine name'
+    label:
+      type: label
+      label: 'Label'
+    description:
+      type: text
+      label: 'Description'
+    field_map:
+      type: mapping
+      label: 'Field map'
+    title_pattern:
+      type: string
+      label: 'Title Pattern'
+    on_empty:
+      type: number
+      label: 'on Empty Title'
+    fallback_title:
+      type: string
+      label: 'Entity Fallback Title'
+      
+views.filter.wisski_bundle:
+  type: views.filter.bundle
+  label: 'WBundle'
+
+views.filter.wisski_field_numeric:
+  type: views_filter
+  label: 'Numeric'
+  mapping:
+    expose:
+      type: mapping
+      label: 'Exposed'
+      mapping:
+        min_placeholder:
+          type: label
+          label: 'Min placeholder'
+        max_placeholder:
+          type: label
+          label: 'Max placeholder'
+        placeholder:
+          type: label
+          label: 'Placeholder'
+
+views.filter_value.wisski_field_numeric:
+  type: mapping
+  label: 'Numeric'
+  mapping:
+    min:
+      type: string
+      label: 'Min'
+    max:
+      type: string
+      label: 'And max'
+    value:
+      type: string
+      label: 'Value'
+
+views.filter_value.*:
+  type: string
+  label: 'Filter value'
+
+views.filter_value.equality:
+  type: string
+  label: 'Equality'

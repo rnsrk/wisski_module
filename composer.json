@@ -1,0 +1,27 @@
+{
+    "name": "drupal/wisski",
+    "description": "WissKI is set of modules which extends drupal with semantic web technology making it a semantic virtual research environment. The current main focus is, but is not restricted to, the digital humanities. For further information see our website http://wiss-ki.eu and the documentation at https://www.drupal.org/docs/8/modules/wisski/",
+    "type": "drupal-module",
+    "homepage": "https://www.drupal.org/project/wisski",
+    "authors": [
+        {
+            "name": "Mark Fichtner",
+            "email": "m.fichtner@wiss-ki.eu",
+            "role": "Maintainer"
+        }
+    ],
+    "support": {
+        "issues": "https://drupal.org/project/issues/wisski",
+        "source": "https://cgit.drupalcode.org/wisski"
+    },
+    "license": "GPL-2.0-or-later",
+    "minimum-stability": "dev",
+    "require": {
+        "easyrdf/easyrdf":"*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Drupal\\wisski_core\\": "src/"
+        }
+    }
+}

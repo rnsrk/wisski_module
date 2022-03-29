@@ -1,0 +1,19 @@
+.wki-disamb-red {
+  color: red;
+}
+
+.wki-pb-solr {
+  display: none;
+}
+
+.wisski-pathbuilder-caret-expanded > label::before,
+.wisski-pathbuilder-caret-collapsed > label::before {
+  margin-right: 1em;
+}
+
+.wisski-pathbuilder-caret-expanded > label::before {
+  content: "\25bc";
+}
+.wisski-pathbuilder-caret-collapsed > label::before {
+  content: "\25b6 ";
+}
