@@ -1,0 +1,9 @@
+name: Mirador Block
+description: Creates a Block with a Mirador Viewer
+package: UBHeidelberg
+type: module
+version: 1.0
+core: 8.x
+core_version_requirement: ^8 || ^9
+libraries:
+  - 'blockmirador/viewer'

@@ -1,0 +1,10 @@
+name: WissKI Duplicate Detection 
+description: A module to detect duplicates in data
+core: 8.x
+package: WissKI
+version: 0.1-dev
+type: module
+core_version_requirement: ^8 || ^9
+configure: wisski_duplicate.wisski_duplicate
+dependencies:
+  - wisski:wisski_core

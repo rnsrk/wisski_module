@@ -1,0 +1,10 @@
+name: WissKI Data Merge 
+description: A module to merge duplicates in data
+core: 8.x
+package: WissKI
+version: 0.1-dev
+type: module
+core_version_requirement: ^8 || ^9
+configure: wisski_data_merge.wisski_data_merge
+dependencies:
+  - wisski:wisski_core

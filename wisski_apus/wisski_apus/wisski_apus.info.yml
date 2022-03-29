@@ -1,0 +1,9 @@
+name: WissKI APUS Commons
+description: Base module for WissKI's Content and Annotation Processing
+core: 8.x
+package: WissKI APUS
+version: 1.x-dev
+core_version_requirement: ^8 || ^9
+type: module
+dependencies:
+ - jquery_ui_accordion

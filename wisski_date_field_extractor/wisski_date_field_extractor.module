@@ -1,0 +1,758 @@
+<?php
+
+/** Module wisski_date_field_extractor
+ *
+ * @author: fit
+ */
+
+/**
+ * Implementation of hook_ENTITY_TYPE_presave
+ * for WissKI's entity type
+ */
+function wisski_date_field_extractor_wisski_individual_presave(Drupal\Core\Entity\EntityInterface $entity) {
+  // switch debugging on/off
+  $debug = False;
+
+  // get fields for entity
+  $entity_type_id = 'wisski_individual';
+  $bundle_id = $entity->get('bundle')->getValue()[0]['target_id'];
+  $fields = $entity->getFieldDefinitions($entity_type_id, $bundle_id);
+
+  if ($debug){
+    \Drupal::messenger()->addMessage("presave-Hook (entity->label: '" . $entity->label() . "' entity->id: " . $entity->id() . " / " . microtime());
+    \Drupal::messenger()->addMessage("..bundle_id: '" . $bundle_id . "' / " . microtime());
+  }
+
+  // iterate through fields looking for wisski type fields
+  foreach ($fields as $field_name => $field_definition) {
+    // get field type
+    $field_type = $field_definition->getType();
+
+    if ($field_type == 'wisski_date_field' || $field_type == 'wisski_verbal_date_field') {
+
+      // assertion: $field_name is of type "wisski_date_field" or "wisski_verbal_date_field"
+
+      // get current value and old value; trim whitespace (remove leading/trailing)
+      // $entityOriginal = \Drupal::entityTypeManager()->getStorage('my_entity')->loadUnchanged($entity->id());
+      // https://drupal.stackexchange.com/questions/219559/how-to-get-the-original-entity-on-hook-entity-presave
+      $value = trim($entity->$field_name->value);
+      $entity->$field_name->value = $value;  // make sure trimmed value is saved
+      $old_value = $entity->original->$field_name->value;
+
+      // do not proceed unless value has changed
+      if ($value === $old_value || ($value == '' and $old_value == NULL)){
+	continue;  // go to next field
+      }
+      $field_label = $field_definition->getLabel();
+
+      if ($debug){
+	\Drupal::messenger()->addMessage("..field_label: '" . $field_label . "' (" . $field_type . ") / " . microtime());
+        \Drupal::messenger()->addMessage("..field_name: '" . $field_name . "' / " . microtime());
+        \Drupal::messenger()->addMessage("..Wert: '" . $value . "' (alt: '" . $old_value . "') / " . microtime());
+      }
+
+      // get settings
+      $field_id_qualified_begin = $entity->$field_name->getFieldDefinition()->getSetting('field_id_qualified_begin');
+      $field_id_earliest_begin = $entity->$field_name->getFieldDefinition()->getSetting('field_id_earliest_begin');
+      $field_id_latest_begin = $entity->$field_name->getFieldDefinition()->getSetting('field_id_latest_begin');
+      $field_id_qualified_end = $entity->$field_name->getFieldDefinition()->getSetting('field_id_qualified_end');
+      $field_id_earliest_end = $entity->$field_name->getFieldDefinition()->getSetting('field_id_earliest_end');
+      $field_id_latest_end = $entity->$field_name->getFieldDefinition()->getSetting('field_id_latest_end');
+
+      // do not proceed if field ids are not set
+      if (!(isset($field_id_qualified_begin) and isset($field_id_earliest_begin) and isset($field_id_latest_begin) 
+	    and isset($field_id_qualified_end) and isset($field_id_earliest_end) and isset($field_id_latest_end))){
+        \Drupal::logger('WissKI Date Field')->warning("There are no target field IDs given for WissKI date field '@field'.", ['@field' => $field_label]);
+	continue;  // go to next field
+      }
+
+      // assertion: there are fields to be filled automatically
+
+      if ($debug){
+        \Drupal::messenger()->addMessage("field_id_qualified_begin: '" . $field_id_qualified_begin . "' / " . microtime());
+        \Drupal::messenger()->addMessage("field_id_earliest_begin: '" . $field_id_earliest_begin . "' / " . microtime());
+        \Drupal::messenger()->addMessage("field_id_latest_begin: '" . $field_id_latest_begin . "' / " . microtime());
+        \Drupal::messenger()->addMessage("field_id_qualified_end: '" . $field_id_qualified_end . "' / " . microtime());
+        \Drupal::messenger()->addMessage("field_id_earliest_end: '" . $field_id_earliest_end . "' / " . microtime());
+        \Drupal::messenger()->addMessage("field_id_latest_end: '" . $field_id_latest_end . "' / " . microtime());
+      }
+
+      // always clear fields
+      // to do: unset rather than set the value "0"
+      $entity->$field_id_qualified_begin->value = 0;
+      $entity->$field_id_earliest_begin->value = 0;
+      $entity->$field_id_latest_begin->value = 0;
+      $entity->$field_id_qualified_end->value = 0;
+      $entity->$field_id_earliest_end->value = 0;
+      $entity->$field_id_latest_end->value = 0;
+
+      // assertion: value is set, fields are empty
+
+      // start processing data
+      $ret = [];
+
+      // EDTF-style date field
+      if ($field_type == 'wisski_date_field'){
+	$ret = _wisski_date_field_process_data($value, $debug);
+	if ($debug){
+          \Drupal::messenger()->addMessage("..return (EDTF, '$field_label'): '" . serialize($ret) . "' / " . microtime());
+	}
+      }
+
+      // verbal date field (MIDAS-style)
+      if ($field_type == 'wisski_verbal_date_field') {
+	$ret = _wisski_date_field_process_verbal_data($value, $debug);
+	if ($debug){
+          \Drupal::messenger()->addMessage("..ret (MIDAS, '$field_label'): '" . serialize($ret) . "' / " . microtime());
+	}
+      }
+
+      // write calculated dates into the fields
+      if (isset($ret[0])){
+        $entity->$field_id_qualified_begin->value = $ret[0];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_qualified_begin: '" . $ret[0] . "' / " . microtime());
+        }
+      }
+      if (isset($ret[1])){
+	$entity->$field_id_earliest_begin->value = $ret[1];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_earliest_begin: '" . $ret[1] . "' / " . microtime());
+        }
+      }
+      if (isset($ret[2])){
+	$entity->$field_id_latest_begin->value = $ret[2];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_latest_begin: '" . $ret[2] . "' / " . microtime());
+        }
+      }
+      if (isset($ret[3])){
+        $entity->$field_id_qualified_end->value = $ret[3];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_qualified_end: '" . $ret[3] . "' / " . microtime());
+        }
+      }
+      if (isset($ret[4])){
+	$entity->$field_id_earliest_end->value = $ret[4];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_earliest_end: '" . $ret[4] . "' / " . microtime());
+        }
+      }
+      if (isset($ret[5])){
+	$entity->$field_id_latest_end->value = $ret[5];
+        if ($debug){
+          \Drupal::messenger()->addMessage(".. $field_id_latest_end: '" . $ret[5] . "' / " . microtime());
+        }
+      }
+    }
+  }
+}
+
+/**
+ *
+ * Calculates begin date and end date for verbal input date and returns 
+ * them to be written into one out of three fields respectively
+ *
+ * @return an array of calculated dates for verbal input date
+ */
+function _wisski_date_field_process_verbal_data($value, $debug) {
+  $ret = [NULL, NULL, NULL, NULL, NULL, NULL];
+  $output_string = "";  // used for debug output
+
+  // 'normalize' multiple whitespace inside of input
+  $value = preg_replace('/\s+/', ' ', $value);
+
+  // Processing input: valid input patterns include:
+  // "....er Jahre" (e.g. "the Twenties"): "1920er Jahre"
+  // "ab/bis/vor/um/nach" ("from/to/before/around/after"): "um 1395"
+  // "x. Jahrhundert" ("xth century"): "17. Jahrhundert"
+  // "Anfang/Mitte/Ende/frühes/spätes/Ausgang/Jahrhundertwende x. Jahrhundert" 
+  //        ("start/middle/end/... of xth century"): "Ausgang 15. Jahrhundert"
+  // "x. Hälfte/Viertel y. Jahrhundert" ("... quarter ..."): "2. Hälfte 5. Jahrhundert"
+  // corresponds to MIDAS standard(??)
+  // from Excel table: "15.05.1420", "05.1420", "1420"
+
+  $preposition_type = "bis|nach|um|ca\.|vor|ab|seit";
+  $century_type_prefix = "Anfang|Mitte|Ende|Frühes|Spätes|Ausgang|Jahrhundertwende";
+  $half_century_prefix = "[12]\. Hälfte";
+  $quarter_century_prefix = "[1234]\. Viertel";
+  $third_century_prefix = "[123]\. Drittel";
+  $decade_prefix = "([123456789]|10)\. Jahrzehnt";
+  $century = "Jahrhundert";
+  //$millennium = "Jahrtausend";
+
+  $four_digits = "\d\d\d\d";
+  $four_digits_decade = "\d\d\d0";
+  $three_or_four_digits = "\d\d\d\d?";
+  $two_digits = "\d\d";
+  $one_or_two_digits = "\d?\d";
+  $one_digit = "[1-9]";
+
+  $day_month_year_pattern = "/^${two_digits}\.${two_digits}\.${four_digits}$/";
+  $month_year_pattern = "/^${two_digits}\.${four_digits}$/";
+  $year_pattern = "/^${four_digits}$/";  // complete dates likely with 4 digits
+  $threefour_year_pattern  = "/^$three_or_four_digits}$/";  // year ranges
+
+  // regex patterns for date in between years, "year/year"
+  $date_between_years_pattern = "/^${three_or_four_digits}\/${three_or_four_digits}$/";
+
+  // regex patterns for period, "year-year"
+  $year_period_pattern = "/^${three_or_four_digits}\-${three_or_four_digits}$/";
+
+  // regex patterns for "...er Jahre", "...ies"
+  $years_ies_pattern = "/^${four_digits_decade}er Jahre$/";
+
+  // regex patterns for "preposition type" verbal dates
+  $preposition_type_pattern = "/^${preposition_type} ${four_digits}$/";
+
+  // regex patterns for "century/millennium type" verbal dates
+  $century_type_pattern = "/^${one_or_two_digits}\. ${century}$/";
+  $x_century_type_pattern = "/^${century_type_prefix} ${one_or_two_digits}\. ${century}$/";
+  $half_century_type_pattern = "/^${half_century_prefix} ${one_or_two_digits}\. ${century}$/";
+  $quarter_century_type_pattern = "/^${quarter_century_prefix} ${one_or_two_digits}\. ${century}$/";
+  $third_century_type_pattern = "/^${third_century_prefix} ${one_or_two_digits}\. ${century}$/";
+  $decade_century_type_pattern = "/^${decade_prefix} ${one_or_two_digits}\. ${century}$/";
+  //$millennium_type_pattern = "/^${century_type_prefix} ${one_digit}\. ${millennium}$/";
+
+  $date_parts = array();
+
+  // date in between years, "year/year"
+  if (preg_match($date_between_years_pattern, $value)) {
+    $date_parts = explode('/', $value);
+    $from_year = (int) $date_parts[0];
+    $to_year = (int) $date_parts[1];
+
+    $output_string = 'Muster "Jahr/Jahr", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // period, "year-year"
+  elseif (preg_match($year_period_pattern, $value)) {
+    $date_parts = explode('-', $value);
+    $from_year = (int) $date_parts[0];
+    $to_year = (int) $date_parts[1];
+
+    $output_string = 'Muster "Jahr/Jahr", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [$from_year, NULL, NULL, $to_year, NULL, NULL];  // qualified/qualified
+  }
+
+  // "...ies type" verbal dates
+  elseif (preg_match($years_ies_pattern, $value)) {
+    $date_parts = explode('er', $value);
+    $year = (int) $date_parts[0];
+
+    // set years
+    $from_year = $year;
+    $to_year = $year + 9;
+
+    $output_string = 'Muster "...ies", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [$from_year, NULL, NULL, $to_year, NULL, NULL];  // qualified/qualified
+  }
+
+  // "simple" date, year, month.year, day.month.year
+  elseif (preg_match($day_month_year_pattern, $value)) {
+    $date_parts = explode('.', $value);
+    $year = (int) $date_parts[2];
+
+    $output_string = 'Muster "Tag.Monat.Jahr", Jahr: "' . $year. '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+  elseif (preg_match($month_year_pattern, $value)) {
+    $date_parts = explode('.', $value);
+    $year = (int) $date_parts[1];
+
+    $output_string = 'Muster "Monat.Jahr", Jahr: "' . $year. '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+  elseif (preg_match($year_pattern, $value)) {
+    $year = (int) $value;
+
+    $output_string = 'Muster "Jahr": "' . $year. '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+
+  // "preposition type" verbal dates
+  elseif (preg_match($preposition_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $prep = $date_parts[0];
+    $year = (int) $date_parts[1];
+
+    // set years depending on the preposition found
+    $from_year = '';
+    $to_year = '';
+    switch ($prep) {
+      case "bis":
+	// starting 50, 20 or 10 years earlier, according to period
+	if ($year < 1401) {
+	  $from_year = $year - 49;
+	}
+        elseif ($year < 1801) {
+          $from_year = $year - 19;
+        }
+	else {
+	  $from_year = $year - 9;
+	}
+	$to_year = $year;
+        $ret = [NULL, NULL, $from_year, $to_year, NULL, NULL];  // latest/qualified
+	break;
+      case "nach":
+        // ending 50, 20 or 10 years later, according to period
+        if ($year < 1401) {
+          $to_year = $year + 50;
+        }
+        elseif ($year < 1801) {
+          $to_year = $year + 20;
+        }
+        else {
+          $to_year = $year + 10;
+        }
+        $from_year = $year + 1;
+        $ret = [$from_year, NULL, NULL, NULL, $to_year, NULL];  // qualified/earliest
+        break;
+      case "um":
+      case "ca.":
+        // starting *and* ending 20, 10 or 5 years earlier/later, according to period
+        if ($year < 1401) {
+          $from_year = $year - 19;
+          $to_year = $year + 20;
+        }
+        elseif ($year < 1801) {
+          $from_year = $year - 9;
+          $to_year = $year + 10;
+        }
+        else {
+          $from_year = $year - 4;
+          $to_year = $year + 5;
+        }
+        $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+        break;
+      case "vor":
+	// starting 50, 20 or 10 years earlier according to period
+	if ($year < 1401) {
+	  $from_year = $year - 49;
+	}
+	elseif ($year < 1801) {
+	  $from_year = $year - 19;
+	}
+	else {
+	  $from_year = $year - 9;
+	}
+	$to_year = $year;
+        $ret = [NULL, NULL, $from_year, $to_year, NULL, NULL];  // latest/qualified
+	break;
+      case "ab":
+      case "seit":
+        // starting from the year given
+        $from_year = $year;
+        $ret = [$from_year, NULL, NULL, NULL, NULL, NULL];  // qualified/-
+        break;
+      default:
+	// this will only happen if there's a pattern left
+	// in this case the default values (empty) will be used
+    }
+    $output_string = 'Muster "' . $preposition_type . ' ...", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+  } 
+
+  // "x. century" type verbal dates
+  elseif (preg_match($century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $cent_raw = $date_parts[0];
+
+    // remove "." from century
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on century
+    $from_year = $year + 1;
+    $to_year = $year + 100;
+
+    $output_string = 'Muster "x. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // "sometime x. century" type verbal dates
+  elseif (preg_match($x_century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $pre = $date_parts[0];
+    $cent_raw = $date_parts[1];
+    $post = $date_parts[2];
+
+    // remove "." from century
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on (part of) century
+    $from_year = '';
+    $to_year = '';
+    switch ($pre) {
+      case "Anfang":
+      case "Frühes":
+	// beginning
+	$from_year = $year + 1;
+	$to_year = $year + 15;
+	break;
+      case "Mitte":
+	// middle
+	$from_year = $year + 46;
+	$to_year = $year + 55;
+	break;
+      case "Ende":
+      case "Spätes":
+      case "Ausgang":
+	// ending
+	$from_year = $year + 86;
+	$to_year = $year + 100;
+	break;
+      case "Jahrhundertwende":
+	// ending and more
+	$from_year = $year + 96;
+	$to_year = $year + 105;
+	break;
+      default:
+	// this will only happen if there's a pattern left
+	// in this case the default values (empty) will be used
+    }
+
+    $output_string = 'Muster "' . $century_type_prefix . ' x. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // "x. Hälfte y. century" type verbal dates
+  elseif (preg_match($half_century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $part_raw = $date_parts[0];
+    $cent_raw = $date_parts[2];
+
+    // remove "."
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    $part = (int) preg_replace('/\./', '//', $part_raw);
+
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on the "century part" found
+    $from_year = '';
+    $to_year = '';
+    switch ($part) {
+      case 1:
+	// first half
+	$from_year = $year + 1;
+	$to_year = $year + 50;
+	break;
+      case 2:
+	// second half
+	$from_year = $year + 51;
+	$to_year = $year + 100;
+	break;
+      default:
+	// this will only happen if there's a pattern left
+	// in this case the default values (empty) will be used
+    }
+
+    $output_string = 'Muster "' .  $half_century_prefix. ' y. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // "x. Viertel y. century" type verbal dates
+  elseif (preg_match($quarter_century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $part_raw = $date_parts[0];
+    $cent_raw = $date_parts[2];
+
+    // remove "."
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    $part = (int) preg_replace('/\./', '//', $part_raw);
+
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on the "century part" found
+    $from_year = '';
+    $to_year = '';
+    switch ($part) {
+      case 1:
+	// first quarter
+	$from_year = $year + 1;
+	$to_year = $year + 25;
+	break;
+      case 2:
+	// second quarter
+	$from_year = $year + 26;
+	$to_year = $year + 50;
+	break;
+      case 3:
+	// third quarter
+	$from_year = $year + 51;
+	$to_year = $year + 75;
+	break;
+      case 4:
+	// fourth quarter
+	$from_year = $year + 76;
+	$to_year = $year + 100;
+	break;
+      default:
+	// this will only happen if there's a pattern left
+	// in this case the default values (empty) will be used
+    }
+
+    $output_string = 'Muster "' .  $quarter_century_prefix. ' y. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // "x. Jahrzehnt y. century" type verbal dates
+  elseif (preg_match($decade_century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $part_raw = $date_parts[0];
+    $cent_raw = $date_parts[2];
+
+    // remove "."
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    $part = (int) preg_replace('/\./', '//', $part_raw);
+
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on the "century part" found
+    $from_year = '';
+    $to_year = '';
+    switch ($part) {
+      case 1:
+        $from_year = $year + 1;
+        $to_year = $year + 10;
+        break;
+      case 2:
+        $from_year = $year + 11;
+        $to_year = $year + 20;
+        break;
+      case 3:
+        $from_year = $year + 21;
+        $to_year = $year + 30;
+        break;
+      case 4:
+        $from_year = $year + 31;
+        $to_year = $year + 40;
+        break;
+      case 5:
+        $from_year = $year + 41;
+        $to_year = $year + 50;
+        break;
+      case 6:
+        $from_year = $year + 51;
+        $to_year = $year + 60;
+        break;
+      case 7:
+        $from_year = $year + 61;
+        $to_year = $year + 70;
+        break;
+      case 8:
+        $from_year = $year + 71;
+        $to_year = $year + 80;
+        break;
+      case 9:
+        $from_year = $year + 81;
+        $to_year = $year + 90;
+        break;
+      case 10:
+        $from_year = $year + 91;
+        $to_year = $year + 100;
+        break;
+      default:
+        // this will only happen if there's a pattern left
+        // in this case the default values (empty) will be used
+    }
+
+    $output_string = 'Muster "' .  $decade_prefix. ' y. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  // "x. Drittel y. century" type verbal dates
+  elseif (preg_match($third_century_type_pattern, $value)) {
+    $date_parts = explode(' ', $value);
+    $part_raw = $date_parts[0];
+    $cent_raw = $date_parts[2];
+
+    // remove "."
+    $cent = (int) preg_replace('/\./', '//', $cent_raw);
+    $part = (int) preg_replace('/\./', '//', $part_raw);
+
+    // "12. Jhd" means start counting from 1100...
+    $year = ($cent -1) * 100;
+
+    // set years depending on the "century part" found
+    $from_year = '';
+    $to_year = '';
+    switch ($part) {
+      case 1:
+        // first third
+        $from_year = $year + 1;
+        $to_year = $year + 33;
+        break;
+      case 2:
+        // second third
+        $from_year = $year + 34;
+        $to_year = $year + 66;
+        break;
+      case 3:
+        // third third
+        $from_year = $year + 67;
+        $to_year = $year + 100;
+        break;
+      default:
+        // this will only happen if there's a pattern left
+        // in this case the default values (empty) will be used
+    }
+
+    $output_string = 'Muster "' .  $third_century_prefix. ' y. Jhd", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+    $ret = [NULL, $from_year, NULL, NULL, NULL, $to_year];  // earliest/latest
+  }
+
+  else {
+    $output_string = 'Eingabe nicht erkannt';
+    if ($debug){
+      \Drupal::messenger()->addMessage("Es wurde kein Jahr in der Eingabe '$value' erkannt!");
+    }
+  }
+  // debugging
+  if ($debug){
+    \Drupal::messenger()->addMessage('Ergebnis: ' . $output_string);
+  }
+  return $ret;
+}
+
+/**
+ *
+ * Calculates possible begin/end dates for input date
+ *
+ * @return an array of calculated dates
+ */
+function _wisski_date_field_process_data($value, $debug) {
+  $ret = [NULL, NULL, NULL, NULL, NULL, NULL];
+  $output_string = "";  // used for debug output
+
+  // remove all whitespace from input as it is not meaningful in EDTF
+  $value = preg_replace('/\s+/', '', $value);
+
+  // Processing input: valid input patterns include:
+  // year: 1943
+  // year-month: 1943-05
+  // year-month-day: 1943-05-01
+  // corresponds to "Level 0 -> Date" in EDTF, see https://www.loc.gov/standards/datetime/
+
+  // range of either of these: <date>/<date>
+  // roughly corresponds to "Level 0 -> Time Interval" in EDTF (Examples 1 to 3 only)
+
+  // to do: Level 1, "Qualification of a date" -> requires another field "uncertainty"
+
+  // to do: check consistency of recognized dates! (1889-13)
+
+  $four_digits = "\d\d\d\d";
+  $two_digits = "\d\d";
+
+  $year_month_day = "${four_digits}-${two_digits}-${two_digits}";
+  $year_month = "${four_digits}-${two_digits}";
+  $year = "${four_digits}";
+
+  // regex patterns for single dates: 1942-07-01 or 1942-07 or 1942
+  $year_month_day_pattern = "/^${year_month_day}$/";
+  $year_month_pattern = "/^${year_month}$/";
+  $year_pattern = "/^${year}$/";
+
+  // regex patterns for date ranges:: 1942-07-01/1943-08-04 or 1942-07/1943-09 or 1942/1953
+  $year_month_day_range_pattern = "/^${year_month_day}\/${year_month_day}$/";
+  $year_month_range_pattern = "/^${year_month}\/${year_month}$/";
+  $year_range_pattern = "/^${year}\/${year}$/";
+
+  // single dates
+  $date_parts = array();
+  if (preg_match($year_month_day_pattern, $value)) {
+    $date_parts = explode('-', $value);
+    $year = (int) $date_parts[0];
+    $month = $date_parts[1];
+    $day = $date_parts[2];
+
+    $output_string = 'Muster "Jahr-Monat-Tag", Beginn: "' . $year . '", Ende: "' . $year . '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+  elseif (preg_match($year_month_pattern, $value)) {
+    $date_parts = explode('-', $value);
+    $year = (int) $date_parts[0];
+    $month = $date_parts[1];
+
+    $output_string = 'Muster "Jahr-Monat", Beginn: "' . $year . '", Ende: "' . $year. '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+  elseif (preg_match($year_pattern, $value)) {
+    $date_parts = explode('-', $value);
+    $year = (int) $date_parts[0];
+
+    $output_string = 'Muster "Jahr", Beginn: "' . $year . '", Ende: "' . $year. '"';
+    $ret = [$year, NULL, NULL, $year, NULL, NULL];  // qualified/qualified
+  }
+
+  // date ranges
+  elseif (preg_match($year_month_day_range_pattern, $value)) {
+    $range_parts = explode('/', $value);
+    $date_parts_from = explode('-', $range_parts[0]);
+    $from_year = (int) $date_parts_from[0];
+    $month_from = $date_parts_from[1];
+    $day_from = $date_parts_from[2];
+    $date_parts_to = explode('-', $range_parts[1]);
+    $to_year = (int) $date_parts_to[0];
+    $month_to = $date_parts_to[1];
+    $day_to = $date_parts_to[2];
+
+    if ($to_year < $from_year) {
+      \Drupal::messenger()->addMessage('Das hintere Jahr darf nicht kleiner sein als das vordere! (' . $value . ')');
+    }
+    else {
+      $output_string = 'Muster "Jahr-Monat-Tag/Jahr-Monat-Tag", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+      $ret = [$from_year, NULL, NULL, $to_year, NULL, NULL];  // qualified/qualified
+    }
+  }
+  elseif (preg_match($year_month_range_pattern, $value)) {
+    $range_parts = explode('/', $value);
+    $date_parts_from = explode('-', $range_parts[0]);
+    $from_year = (int) $date_parts_from[0];
+    $month_from = $date_parts_from[1];
+    $date_parts_to = explode('-', $range_parts[1]);
+    $to_year = (int) $date_parts_to[0];
+    $month_to = $date_parts_to[1];
+
+    if ($to_year < $from_year) {
+      \Drupal::messenger()->addMessage('Das hintere Jahr darf nicht kleiner sein als das vordere! (' . $value . ')');
+    }
+    else {
+      $output_string = 'Muster "Jahr-Monat/Jahr-Monat", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+      $ret = [$from_year, NULL, NULL, $to_year, NULL, NULL];  // qualified/qualified
+    }
+  }
+  elseif (preg_match($year_range_pattern, $value)) {
+    $range_parts = explode('/', $value);
+    $date_parts_from = explode('-', $range_parts[0]);
+    $from_year = (int) $date_parts_from[0];
+    $date_parts_to = explode('-', $range_parts[1]);
+    $to_year = (int) $date_parts_to[0];
+
+    if ($to_year < $from_year) {
+      \Drupal::messenger()->addMessage('Das hintere Jahr darf nicht kleiner sein als das vordere! (' . $value . ')');
+    }
+    else {
+      $output_string = 'Muster "Jahr/Jahr", Beginn: "' . $from_year . '", Ende: "' . $to_year. '"';
+      $ret = [$from_year, NULL, NULL, $to_year, NULL, NULL];  // qualified/qualified
+    }
+  }
+  else {
+    $output_string = 'Eingabe nicht erkannt';
+    if ($debug){
+      \Drupal::messenger()->addMessage("Es wurde kein Jahr in der Eingabe '$value' erkannt!");
+    }
+  }
+  // debugging
+  if ($debug){
+    \Drupal::messenger()->addMessage('Ergebnis: ' . $output_string);
+  }
+  return $ret;
+}
+

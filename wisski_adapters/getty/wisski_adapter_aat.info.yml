@@ -1,0 +1,9 @@
+name: WissKI Getty AAT Adapter
+description: A WissKI adapter that directly queries the Getty AAT
+core: 8.x
+core_version_requirement: ^8 || ^9
+package: WissKI Adapters
+version: 0.1-dev
+type: module
+dependencies:
+  - wisski:wisski_salz

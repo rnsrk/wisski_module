@@ -1,0 +1,6 @@
+wisski.wisski_data_merge:
+  title: 'WissKI Data Merge'
+  description: 'Merge data duplicates in your system'
+  parent: wisski.content
+  route_name: wisski.wisski_data_merge
+  weight: 100

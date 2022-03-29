@@ -1,0 +1,12 @@
+mirador:
+  js:
+    /libraries/wisski-mirador-integration/mirador-integration.js: { minified: true }
+    js/wisski_mirador.js: { }
+  css:
+    theme:
+      css/wisski_mirador.css: {}
+  dependencies:
+    - core/jquery
+    - core/drupal
+    - core/drupalSettings
+    - core/once

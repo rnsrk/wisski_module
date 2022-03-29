@@ -1,0 +1,5 @@
+wisskiDoi:
+  version: VERSION
+  css:
+    component:
+      css/wisskiDoi.css: {}

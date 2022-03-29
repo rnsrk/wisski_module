@@ -1,0 +1,48 @@
+{#
+/**
+ * @file
+ * Theme to display contributors at DOI request page.
+ *
+ * Provide the possibility to clear the list and remove
+ * single contributors.
+ *
+ * Available variables:
+ * - contributors: The names like "Noah Musterperson".
+ * - error: The error, if contributor field fails the validation.
+ *
+ * @ingroup themeable
+ */
+#}
+
+<div class="wisski-doi-settings-contributor" id="contributor-list">
+  {% if error is not empty %}
+    <div role="contentinfo" aria-label="Error message" class="messages messages--error">
+      <div role="alert">
+        <h2 class="visually-hidden">{% trans %}Error message{% endtrans %}</h2>
+        {{ error }}
+      </div>
+    </div>
+  {% endif %}
+  {% if contributors is not empty %}
+    <section class="wisski-doi-settings-contributor--list">
+      <div class="wisski-doi-settings--item">
+        <h3 class="label">{% trans %}Contributor list{% endtrans %}</h3>
+        <div>
+          <a href="{{ path('wisski_individual.doi.contributors.clear_contributors') }}"
+             class="use-ajax wisski-doi-settings-contributor--clear">{% trans %}Clear list{% endtrans %}</a>
+        </div>
+      </div>
+      {% for contributor in contributors %}
+        <div class="wisski-doi-settings--item">
+          <div class="wisski-doi-settings-contributors--contributor">{{ contributor['name'] }}</div>
+          <div>
+            <a href="{{ path('wisski_individual.doi.contributors.remove_contributor', {'contributor': contributor['name']}) }}"
+               class="use-ajax wisski-doi-settings-contributor--remove">{% trans %}Remove{% endtrans %}</a>
+          </div>
+        </div>
+      {% endfor %}
+    </section>
+  {% else %}
+    {% trans %}Contributor list is empty{% endtrans %}
+  {% endif %}
+</div>

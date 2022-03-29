@@ -1,0 +1,44 @@
+wisski_mirador.mainpage:
+  path: '/wisski/mirador'
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\MiradorController::start'
+  requirements:
+    _access: 'TRUE'
+    
+wisski_mirador.api.common:
+  path: '/wisski/mirador-annotations'
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\WisskiMiradorApiController::common'
+  requirements:
+    _access: 'TRUE'
+
+    
+wisski_mirador.api.pages:
+  path: '/wisski/mirador-annotations/pages'
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\WisskiMiradorApiController::pages'
+  requirements:
+    _access: 'TRUE'
+
+wisski_mirador.api.edit_annotation:
+  path: '/wisski/mirador-annotations/{annotation_id}'
+  methods: [PATCH]
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\WisskiMiradorApiController::edit_annotation'
+  requirements:
+    _access: 'TRUE'
+    
+wisski_mirador.api.delete_annotation:
+  path: '/wisski/mirador-annotations/{annotation_id}'
+  methods: [DELETE]
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\WisskiMiradorApiController::delete_annotation'
+  requirements:
+    _access: 'TRUE'
+    
+wisski_mirador.api.lists:
+  path: '/wisski/mirador-annotations/lists'
+  defaults:
+    _controller: '\Drupal\wisski_mirador\Controller\WisskiMiradorApiController::lists'
+  requirements:
+    _access: 'TRUE'

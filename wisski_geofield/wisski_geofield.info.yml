@@ -1,0 +1,9 @@
+name: WissKI Geofield Widget
+type: module
+description: Provides a single field for lat, lon input
+package: WissKI
+version: VERSION
+core_version_requirement: ^8 || ^9
+core: 8.x
+dependencies:
+  - geofield:geofield

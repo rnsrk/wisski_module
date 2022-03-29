@@ -1,0 +1,7 @@
+wisski.wisski_duplicate:
+  path: '/admin/config/wisski/duplicate'
+  defaults:
+    _form: '\Drupal\wisski_duplicate\Form\WisskiDuplicateForm'
+    _title: 'Duplicate Detection'
+  requirements:
+    _permission: 'administer wisski'

@@ -1,0 +1,102 @@
+entity.wisski_bundle.doi_batch:
+  path: 'admin/structure/wisski_core/{wisski_bundle}/doi_batch'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiBatchForm'
+    _title: 'Get DOIs'
+  requirements:
+    _permission: 'administer wisski dois'
+
+wisski.wisski_doi_settings.tabs.default:
+  path: '/admin/config/wisski/wisski_doi_settings'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiRepositorySettings'
+    _title: 'WissKI DOI Settings'
+  requirements:
+    _permission: 'administer wisski bundles'
+
+wisski_individual.doi.administration:
+  path: '/wisski/navigate/{wisski_individual}/doi'
+  defaults:
+    _controller: '\Drupal\wisski_doi\Controller\WisskiDoiAdministration::overview'
+    _title: 'DOI Administration'
+  requirements:
+    _permission: 'administer wisski dois'
+  options:
+    parameters:
+      wisski_individual:
+        type: wisski_individual
+
+wisski_individual.doi.for_static_revision:
+  path: '/wisski/navigate/{wisski_individual}/revision/get-doi-for-static'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormRequestDoiForStaticRevision'
+    _title: 'Do you want to request a new DOI for a static revision?'
+  requirements:
+    _permission: 'administer wisski dois'
+    wisski_individual: \d+
+
+wisski_individual.doi.batch_for_static_revisions:
+  path: '/admin/structure/wisski_doi/{wisskiBundleId}/batch-dois-for-static'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiBatch4StaticRevisionsConfirmForm'
+    _title: 'Do you want to request DOIs for static revisions of all selected individuals?'
+  requirements:
+    _permission: 'administer wisski dois'
+
+wisski_individual.doi.for_current_revision:
+  path: '/wisski/navigate/{wisski_individual}/revision/get-doi-for-current'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormRequestDoiForRevision'
+    _title: 'Do you want to request a new DOI for the current revision?'
+  requirements:
+    _permission: 'administer wisski dois'
+    wisski_individual: '\d+'
+
+wisski_individual.doi.batch_for_current_revisions:
+  path: '/admin/structure/wisski_doi/{wisskiBundleId}/batch-dois-for-current'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiBatch4CurrentRevisionsConfirmForm'
+    _title: 'Do you want to request DOIs for current revisions of all selected individuals?'
+  requirements:
+    _permission: 'administer wisski dois'
+
+wisski_individual.doi.edit_metadata:
+  path: '/wisski/navigate/{wisski_individual}/{did}/edit-metadata'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormUpdateMetadata'
+    _title: 'Edit Doi Metadata'
+  requirements:
+    _permission: 'administer wisski dois'
+    wisski_individual: '\d+'
+    did: '\d+'
+
+wisski_individual.doi.delete:
+  path: '/wisski/navigate/{wisski_individual}/{did}/delete'
+  defaults:
+    _form: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormDeleteDoi'
+    _title: 'Do you want to delete the DOI?'
+  requirements:
+    _permission: 'administer wisski dois'
+    wisski_individual: '\d+'
+    did: '\d+'
+
+wisski_individual.doi.contributors.remove_contributor:
+  path: '/ajax/admin/doi/contributors/remove/{contributor}'
+  defaults:
+    _controller: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormRequestDoiForStaticRevision::removeContributor'
+    _title: 'Remove contributor'
+  requirements:
+    _permission: 'administer wisski dois'
+
+wisski_individual.doi.contributors.clear_contributors:
+  path: '/ajax/admin/doi/contributors/clear'
+  defaults:
+    _controller: '\Drupal\wisski_doi\Form\WisskiDoiConfirmFormRequestDoiForStaticRevision::clearContributors'
+    _title: 'Clear contributors'
+  requirements:
+    _permission: 'administer wisski dois'
+
+
+
+
+

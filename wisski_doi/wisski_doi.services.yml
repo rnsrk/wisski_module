@@ -1,0 +1,24 @@
+services:
+  wisski_doi.wisski_doi_actions:
+    class: Drupal\wisski_doi\WisskiDoiActions
+    arguments:
+      - '@string_translation'
+      - '@date.formatter'
+      - '@datetime.time'
+      - '@wisski_doi.wisski_doi_rest_actions'
+      - '@wisski_doi.wisski_doi_db_actions'
+      - '@entity_type.manager'
+
+  wisski_doi.wisski_doi_db_actions:
+    class: Drupal\wisski_doi\WisskiDoiDbActions
+    arguments:
+      - '@database'
+      - '@messenger'
+      - '@string_translation'
+  wisski_doi.wisski_doi_rest_actions:
+    class: Drupal\wisski_doi\WisskiDoiDataciteRestActions
+    arguments:
+      - '@string_translation'
+      - '@messenger'
+      - '@http_client'
+      - '@config.factory'

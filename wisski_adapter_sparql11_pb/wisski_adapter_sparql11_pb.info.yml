@@ -1,0 +1,10 @@
+name: WissKI SPARQL1.1 Adapter with Pathbuilder
+description: A WissKI adapter module that connects to a SPARQL1.1 store using a path builder
+core: 8.x
+package: WissKI
+version: 0.1-dev
+type: module
+core_version_requirement: ^8 || ^9
+configure: wisski_adapters.wisski_adapter_sparql11_pb
+dependencies:
+ - wisski:wisski_pathbuilder

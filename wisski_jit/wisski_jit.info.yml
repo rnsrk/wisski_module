@@ -1,0 +1,11 @@
+name: WissKI SPARQL1.1 JIT Module 
+description: A visualisation Module using JIT for WissKI Entities in triple stores
+core: 8.x
+package: WissKI
+version: 0.1-dev
+core_version_requirement: ^8 || ^9
+type: module
+libraries:
+ - wisski_jit/Jit
+dependencies:
+ - wisski:wisski_adapter_sparql11_pb

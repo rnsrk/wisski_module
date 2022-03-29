@@ -1,0 +1,66 @@
+<?php
+
+/**
+ * @file
+ * Install new database table 'wisski_doi'.
+ */
+
+/**
+ * Define scheme of wisski_doi table.
+ */
+function wisski_doi_schema() {
+  $schema['wisski_doi'] = [
+
+    'description' => 'Saves the namespaces on ontology load.',
+    'fields' => [
+      'did' => [
+        'description' => 'Primarykey for DOI table',
+        'type' => 'serial',
+        'size' => 'normal',
+        'not null' => TRUE,
+      ],
+      'eid' => [
+        'description' => 'The entity id.',
+        'type' => 'int',
+        'size' => 'big',
+      ],
+      'doi' => [
+        'description' => 'The actual DOI.',
+        'type' => 'varchar',
+        'length' => 255,
+      ],
+      'vid' => [
+        'description' => 'The ID of the corresponding revision.',
+        'type' => 'int',
+        'size' => 'big',
+      ],
+      'state' => [
+        'description' => 'State: draft, registered, findable',
+        'type' => 'varchar',
+        'length' => 10,
+        'not null' => TRUE,
+      ],
+      'revisionUrl' => [
+        'description' => 'The entity URL inside the instance',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ],
+      'isCurrent' => [
+        'description' => 'Is this revision the current revision?',
+        'type' => 'int',
+        'size' => 'tiny',
+        'default' => 0,
+      ],
+      'created' => [
+        'description' => 'Creation time of the DOI.',
+        'type' => 'varchar',
+        'length' => 50,
+        'not null' => TRUE,
+      ],
+    ],
+    'primary key' => ['did'],
+  ];
+
+  return $schema;
+}

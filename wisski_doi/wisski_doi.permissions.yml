@@ -1,0 +1,5 @@
+administer wisski dois:
+  title: 'Administer WissKI DOIs'
+  description: 'Administer (Request, Update, Delete DOIs'
+  restrict access: true
+

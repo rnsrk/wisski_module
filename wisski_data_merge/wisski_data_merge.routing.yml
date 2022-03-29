@@ -1,0 +1,7 @@
+wisski.wisski_data_merge:
+  path: '/admin/config/wisski/data_merge'
+  defaults:
+    _form: '\Drupal\wisski_data_merge\Form\WisskiDataMergeForm'
+    _title: 'Merge data'
+  requirements:
+    _permission: 'administer wisski'

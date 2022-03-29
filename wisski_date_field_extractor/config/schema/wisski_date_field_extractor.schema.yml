@@ -1,0 +1,44 @@
+field.field_settings.wisski_date_field:
+  type: mapping
+  label: 'WissKI date field settings'
+  mappings:
+    field_id_qualified_begin:
+      type: string
+      label: 'qualified begin'
+    field_id_earliest_begin:
+      type: string
+      label: 'earliest begin'
+    field_id_latest_begin:
+      type: string
+      label: 'latest begin'
+    field_id_qualified_end:
+      type: string
+      label: 'qualified end'
+    field_id_earliest_end:
+      type: string
+      label: 'earliest end'
+    field_id_latest_end:
+      type: string
+      label: 'latest end'
+field.field_settings.wisski_verbal_date_field:
+  type: mapping
+  label: 'WissKI verbal date field settings'
+  mappings:
+    field_id_qualified_begin:
+      type: string
+      label: 'qualified begin'
+    field_id_earliest_begin:
+      type: string
+      label: 'earliest begin'
+    field_id_latest_begin:
+      type: string
+      label: 'latest begin'
+    field_id_qualified_end:
+      type: string
+      label: 'qualified end'
+    field_id_earliest_end:
+      type: string
+      label: 'earliest end'
+    field_id_latest_end:
+      type: string
+      label: 'latest end'

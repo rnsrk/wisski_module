@@ -1,0 +1,15 @@
+viewer:
+  version: 1.x
+  css:
+    layout:
+      css/blockmirador.css: {}
+  js:
+    js/blockmirador.js: {}
+    /libraries/mirador/dist/mirador.min.js: {}
+    #js/mirador_noconflict.js: {}
+  dependencies:
+    - core/jquery
+    - core/drupal
+    - core/drupalSettings
+    - core/once
+  

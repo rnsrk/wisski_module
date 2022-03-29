@@ -1,0 +1,12 @@
+<?php
+
+use Drupal\Core\Routing\RouteMatchInterface;
+/**
+ * Implementation of Hook_help
+ */
+function wisski_pipe_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.wisski_pipe':
+      return '<p>' . t('This module handles data pipes for text anaysis in WissKI') . '</p>';
+  }
+}

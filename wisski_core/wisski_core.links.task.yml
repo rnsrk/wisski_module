@@ -1,0 +1,33 @@
+entity.wisski_individual.canonical:
+  route_name: entity.wisski_individual.canonical
+  base_route: entity.wisski_individual.canonical
+  title: View
+  weight: -100
+entity.wisski_individual.edit_form:
+  route_name: entity.wisski_individual.edit_form
+  base_route: entity.wisski_individual.canonical
+  title: Edit
+  weight: -99
+entity.wisski_individual.delete_form:
+  route_name: entity.wisski_individual.delete_form
+  base_route: entity.wisski_individual.canonical
+  title: Delete
+  weight: -98
+entity.wisski_individual.version_history:
+  route_name: entity.wisski_individual.version_history
+  base_route: entity.wisski_individual.canonical
+  title: 'Revisions'
+  weight: 20
+entity.wisski_bundle.edit_form:
+  route_name: entity.wisski_bundle.edit_form
+  base_route: entity.wisski_bundle.edit_form
+  title: Edit
+configuration.ontology.display_ontologies:
+  route_name: wisski.wisski_ontology
+  base_route: wisski.wisski_ontology
+  title: Display Ontologies
+configuration.ontology.display_namespaces:
+  route_name: wisski.wisski_ontology.namespace.show_table
+  base_route: wisski.wisski_ontology
+  title: Display Namespaces
+

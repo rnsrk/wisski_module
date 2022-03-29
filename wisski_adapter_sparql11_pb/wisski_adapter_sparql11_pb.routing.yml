@@ -1,0 +1,13 @@
+wisski_adapter_sparql11_pb.wisski_autocomplete:
+  path: '/wisski/autocomplete/{fieldid}/{pathid}/{pbid}/{engineid}'
+  defaults:
+    _controller: '\Drupal\wisski_adapter_sparql11_pb\Controller\Sparql11AutocompleteController::autocomplete'
+  requirements:
+    _permission: 'access content'
+
+wisski_adapter_sparql11_pb.wisski_endpoint:
+  path: '/wisski/endpoint/{endpoint_id}'
+  defaults:
+    _form: '\Drupal\wisski_adapter_sparql11_pb\Controller\Sparql11EndpointController'
+  requirements:
+    _permission: 'access sparql endpoints'

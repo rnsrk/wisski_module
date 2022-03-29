@@ -1,0 +1,44 @@
+/**
+ * @file
+ * Layouts for the DOI Module.
+ */
+
+/**
+ * Styling the contributor table in the update form.
+ */
+.wisski-doi-settings-contributor--list {
+  padding: 0;
+  margin: 12px 0;
+  width: 55%;
+}
+
+.wisski-doi-settings--item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.wisski-doi-settings--item + .wisski-doi-settings--item {
+  margin-top: 8px;
+}
+
+.wisski-doi-contributorGroup {
+  border: unset;
+}
+
+.wisski-doi-contributorGroup .fieldset-wrapper {
+  display: flex;
+  align-items: first baseline;
+  flex-wrap: wrap;
+}
+
+.form-item-contributors-contributorgroup-contributor {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 0 0 0;
+  position: relative;
+  max-width: 100%;
+}
+
+#edit-contributors-contributorgroup-contributor--description {
+  flex: 100%;
+}

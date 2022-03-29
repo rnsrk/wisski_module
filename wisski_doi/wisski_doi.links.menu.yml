@@ -1,0 +1,6 @@
+wisski.wisski_doi_settings:
+  title: 'WissKI DOI Settings'
+  description: 'Change WissKI DOI Settings'
+  parent: wisski.content
+  route_name: wisski.wisski_doi_settings.tabs.default
+  weight: 100

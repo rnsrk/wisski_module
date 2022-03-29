@@ -1,0 +1,17 @@
+wisski.wisski_doi_settings.tabs:
+  route_name: wisski.wisski_doi_settings.tabs.default
+  title: DOI repository settings
+  base_route: wisski.wisski_doi_settings.tabs.default
+
+entity.wisski_individual.tabs.doi:
+  route_name: wisski_individual.doi.administration
+  title: DOI
+  base_route: entity.wisski_individual.canonical
+  weight: 20
+
+entity.wisski_bundle.doi_batch.tabs:
+  route_name: entity.wisski_bundle.doi_batch
+  title: Get DOIs
+  base_route: entity.wisski_bundle.edit_form
+  weight: 20
+

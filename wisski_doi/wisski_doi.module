@@ -1,0 +1,70 @@
+<?php
+
+/**
+ * @file
+ * Implement hooks for the WissKI individual revision table.
+ */
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\StringTranslation\TranslatableMarkup;
+use Drupal\Core\Url;
+
+/**
+ * Alter the header in revisions table at wisski individuals.
+ */
+function wisski_doi_revision_menu_header_alter() {
+  return [
+    new TranslatableMarkup('Revision'),
+    new TranslatableMarkup('DOI'),
+    new TranslatableMarkup('Operations'),
+  ];
+}
+
+/**
+ * Provide render template for contributors at DOI request form.
+ *
+ * @return array
+ */
+
+function wisski_doi_theme() {
+  return [
+    'contributors' => [
+      'render element' => 'children',
+    ],
+    'contributor-list' => [
+      'variables' => [
+        'contributors' => NULL,
+        'error' => NULL,
+      ],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_help().
+ */
+function wisski_doi_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.wisski_doi':
+      return '<p>' . t('This module provides the possibility to request DOIs for single WissKI entities. More information and tutorial at <a href="https://wiss-ki.eu/documentation/DOIs">wiss-ki.eu</a>.</p>');
+  }
+}
+
+/**
+ * Implements hook_entity_operation_alter().
+ * Add menu entry "DOI Scheme" at "WissKI Groups and Bundles" in Structure.
+ */
+function wisski_doi_entity_operation_alter(array &$operations, EntityInterface $entity) {
+  $entityTypeId = $entity->getEntityTypeId();
+  if ($entityTypeId !== 'wisski_bundle') {
+    return;
+  }
+  $bundleId = $entity->id();
+  $editUrl = Url::fromRoute('entity.wisski_bundle.doi_batch', ['wisski_bundle' => $bundleId]);
+  $operations['doi_batch'] = [
+    'title' => t('Get DOIs'),
+    'weight' => 100,
+    'url' => $editUrl,
+  ];
+}

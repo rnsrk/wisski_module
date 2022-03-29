@@ -1,0 +1,12 @@
+name: WissKI IIP Image View
+type: module
+description: Provides IIP Image view for Images
+package: WissKI
+version: VERSION
+core_version_requirement: ^8 || ^9
+core: 8.x
+dependencies:
+  - drupal:field
+  - imagemagick:imagemagick
+  - image_effects:image_effects
+  - colorbox:colorbox
